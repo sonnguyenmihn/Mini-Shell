@@ -32,3 +32,24 @@ Note: This section is for stages 2 and beyond.
    `src/main.cpp`.
 1. Commit your changes and run `git push origin master` to submit your solution
    to CodeCrafters. Test output will be streamed to your terminal.
+
+# Fixing Issues
+
+To fix the issues mentioned in the colleague's message, follow these steps:
+
+1. Install the Xcode Command Line Tools (which includes the C/C++ compilers):
+
+```bash
+xcode-select --install
+```
+
+2. Install vcpkg and set up the environment variable:
+
+```bash
+git clone https://github.com/Microsoft/vcpkg.git
+cd vcpkg
+./bootstrap-vcpkg.sh
+export VCPKG_ROOT=$(pwd)
+```
+
+These commands will help you fix the issues and successfully run your program.
