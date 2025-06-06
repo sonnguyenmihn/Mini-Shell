@@ -13,6 +13,6 @@ int main() {
     if (input == "exit") {
       break;
     }
-    std::cout << input << ": command not found\n" << std::endl;
+    std::cout << input << ": command not found\n";
   }
 }
