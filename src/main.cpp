@@ -121,7 +121,7 @@ int main()
         }
         else
         {
-          std::cout << std::filesystem::current_path() << std::endl;
+          std::cout << std::filesystem::current_path().string() << std::endl;
         }
       }
     }
