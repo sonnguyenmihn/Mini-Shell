@@ -124,6 +124,25 @@ int main()
           std::cout << std::filesystem::current_path().string() << std::endl;
         }
       }
+      else if (command == "cd")
+      {
+        if (args.size() > 2)
+        {
+          std::cout << "cd: too many arguments" << std::endl;
+        }
+        else if (args.size() == 2)
+        {
+          std::string path = args[1];
+          // Absolute path
+          if (path[0] == '/')
+          {
+            if (std::filesystem::exists(path) && std::filesystem::is_directory(path))
+            {
+              std::filesystem::current_path(path);
+            }
+          }
+        }
+      }
     }
     else
     {
