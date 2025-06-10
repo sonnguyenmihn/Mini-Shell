@@ -140,6 +140,10 @@ int main()
             {
               std::filesystem::current_path(path);
             }
+            else
+            {
+              std::cout << "cd: " << path << ": No such file or directory" << std::endl;
+            }
           }
         }
       }
