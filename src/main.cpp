@@ -130,6 +130,10 @@ int main()
         {
           std::cout << "cd: too many arguments" << std::endl;
         }
+        else if (args.size() == 1)
+        {
+          std::filesystem::current_path(std::filesystem::path(std::getenv("HOME")));
+        }
         else if (args.size() == 2)
         {
           std::string path = args[1];
@@ -139,6 +143,34 @@ int main()
             if (std::filesystem::exists(path) && std::filesystem::is_directory(path))
             {
               std::filesystem::current_path(path);
+            }
+            else
+            {
+              std::cout << "cd: " << path << ": No such file or directory" << std::endl;
+            }
+          }
+          // ~
+          else if (path[0] == '~')
+          {
+            std::filesystem::path home_path = std::filesystem::path(std::getenv("HOME"));
+            std::filesystem::path new_path = home_path / path.substr(1);
+            if (std::filesystem::exists(new_path) && std::filesystem::is_directory(new_path))
+            {
+              std::filesystem::current_path(new_path);
+            }
+            else
+            {
+              std::cout << "cd: " << path << ": No such file or directory" << std::endl;
+            }
+          }
+          // Relative path
+          else
+          {
+            std::filesystem::path current_path = std::filesystem::current_path();
+            std::filesystem::path new_path = current_path / path;
+            if (std::filesystem::exists(new_path) && std::filesystem::is_directory(new_path))
+            {
+              std::filesystem::current_path(new_path);
             }
             else
             {
