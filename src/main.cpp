@@ -2,9 +2,145 @@
 #include <string>
 #include <cstdlib>
 #include <unordered_set>
+#include <unordered_map>
 #include <filesystem>
 #include <vector>
 #include <sstream>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+
+// Global variables
+const std::unordered_set<std::string> BUILTIN_COMMANDS = {
+    "echo", "type", "exit", "cd", "pwd", "export", "unset",
+    "alias", "unalias", "source", ".", ":", "true", "false"};
+
+// Cache for command paths
+std::unordered_map<std::string, std::string> command_path_cache;
+
+// Function declaration
+std::vector<std::string> split(const std::string &str, char delim);
+bool is_executable(const std::string &path);
+std::string find_command_path(const std::string &command);
+void execute_command(const std::string &command, const std::vector<std::string> &args);
+
+int main()
+{
+  // Flush after every std::cout / std:cerr
+  std::cout << std::unitbuf;
+  std::cerr << std::unitbuf;
+
+  while (true)
+  {
+    std::cout << "$ ";
+    std::string input;
+    std::getline(std::cin, input);
+
+    // Split input into command and arguments
+    std::vector<std::string> args = split(input, ' ');
+    if (args.empty())
+      continue;
+
+    std::string command = args[0];
+
+    // Check if it's a builtin command
+    if (BUILTIN_COMMANDS.find(command) != BUILTIN_COMMANDS.end())
+    {
+      if (command == "exit")
+      {
+        // Handle exit command
+        if (args.size() == 2)
+        {
+          try
+          {
+            int status = std::stoi(args[1]);
+            if (status >= 0 && status <= 255)
+            {
+              return status;
+            }
+          }
+          catch (...)
+          {
+            return 0;
+          }
+        }
+        else if (args.size() > 2)
+        {
+          std::cout << "exit: too many arguments" << std::endl;
+        }
+        else
+        {
+          return 0;
+        }
+      }
+      else if (command == "echo")
+      {
+        // Handle echo command
+        if (args.size() > 1)
+        {
+          // Join all arguments after "echo" with spaces
+          std::string message;
+          for (size_t i = 1; i < args.size(); ++i)
+          {
+            if (i > 1)
+              message += " ";
+            message += args[i];
+          }
+          std::cout << message << std::endl;
+        }
+      }
+      else if (command == "type")
+      {
+        // Handle type command
+        if (args.size() > 1)
+        {
+          std::string target = args[1];
+          if (BUILTIN_COMMANDS.find(target) != BUILTIN_COMMANDS.end())
+          {
+            std::cout << target << " is a shell builtin" << std::endl;
+          }
+          else
+          {
+            std::string path = find_command_path(target);
+            if (!path.empty())
+            {
+              std::cout << target << " is " << path << std::endl;
+            }
+            else
+            {
+              std::cout << target << ": not found" << std::endl;
+            }
+          }
+        }
+      }
+      else if (command == "pwd")
+      {
+        if (args.size() > 1)
+        {
+          std::cout << "pwd: too many arguments" << std::endl;
+        }
+        else
+        {
+          std::cout << std::filesystem::current_path() << std::endl;
+        }
+      }
+    }
+    else
+    {
+      // Not a builtin command, check if it's an executable in PATH
+      std::string path = find_command_path(command);
+      if (!path.empty())
+      {
+        execute_command(command, args);
+      }
+      else
+      {
+        std::cout << command << ": command not found" << std::endl;
+      }
+    }
+  }
+  return 0;
+}
 
 // Function to split string by delimiter
 std::vector<std::string> split(const std::string &str, char delim)
@@ -30,88 +166,85 @@ bool is_executable(const std::string &path)
          (std::filesystem::status(file_path).permissions() & std::filesystem::perms::owner_exec) != std::filesystem::perms::none;
 }
 
-int main()
+// Function to find command path, using cache if available
+std::string find_command_path(const std::string &command)
 {
-  // Flush after every std::cout / std:cerr
-  std::cout << std::unitbuf;
-  std::cerr << std::unitbuf;
-  std::unordered_set<std::string> builtin_commands = {"echo", "type", "exit"};
-
-  while (true)
+  // Check cache first
+  auto it = command_path_cache.find(command);
+  if (it != command_path_cache.end())
   {
-    std::cout << "$ ";
-    std::string input;
-    std::getline(std::cin, input);
+    return it->second;
+  }
 
-    // Check if input starts with "exit"
-    if (input.substr(0, 4) == "exit")
-    {
-      // If there's a space after "exit", try to parse the status code
-      if (input.length() > 4 && input[4] == ' ')
-      {
-        try
-        {
-          int status = std::stoi(input.substr(5));
-          if (status >= 0 && status <= 255)
-          {
-            return status;
-          }
-        }
-        catch (...)
-        {
-          // If parsing fails, just exit with 0
-          return 0;
-        }
-      }
-      return 0;
-    }
-    else if (input.substr(0, 5) == "echo ")
-    {
-      std::cout << input.substr(5) << std::endl;
-    }
-    else if (input.substr(0, 5) == "type ")
-    {
-      std::string command = input.substr(5);
-      if (builtin_commands.find(command) != builtin_commands.end())
-      {
-        std::cout << command << " is a shell builtin" << std::endl;
-      }
-      else
-      {
-        // Get PATH from environment
-        const char *path_env = std::getenv("PATH");
-        if (path_env)
-        {
-          std::vector<std::string> path_dirs = split(path_env, ':');
-          bool found = false;
+  // If not in cache, search PATH
+  const char *path_env = std::getenv("PATH");
+  if (path_env)
+  {
+    std::vector<std::string> path_dirs = split(path_env, ':');
 
-          // Search each directory in PATH
-          for (const auto &dir : path_dirs)
-          {
-            std::string full_path = dir + "/" + command;
-            if (is_executable(full_path))
-            {
-              std::cout << command << " is " << full_path << std::endl;
-              found = true;
-              break;
-            }
-          }
-
-          if (!found)
-          {
-            std::cout << command << ": not found" << std::endl;
-          }
-        }
-        else
-        {
-          std::cout << command << ": not found" << std::endl;
-        }
-      }
-    }
-    else
+    for (const auto &dir : path_dirs)
     {
-      std::cout << input << ": command not found" << std::endl;
+      std::string full_path = dir + "/" + command;
+      if (is_executable(full_path))
+      {
+        // Add to cache
+        command_path_cache[command] = full_path;
+        return full_path;
+      }
     }
   }
-  return 0;
+
+  return ""; // Command not found
+}
+
+void execute_command(const std::string &command, const std::vector<std::string> &args)
+{
+  pid_t pid = fork();
+  if (pid == -1)
+  {
+    std::cerr << "fork failed" << std::endl;
+    return;
+  }
+  else if (pid == 0)
+  {
+    // Child process
+    std::vector<char *> args_array;
+    args_array.reserve(args.size() + 1);
+
+    // Convert strings to char* and store them
+    for (const auto &arg : args)
+    {
+      char *arg_copy = (char *)malloc(arg.length() + 1); // +1 for null terminator
+      if (arg_copy == nullptr)
+      {
+        std::cerr << "Memory allocation failed" << std::endl;
+        exit(1);
+      }
+      strcpy(arg_copy, arg.c_str());
+      args_array.push_back(arg_copy);
+    }
+    args_array.push_back(nullptr); // Null terminate the array
+
+    // Execute the command
+    execvp(command.c_str(), args_array.data());
+
+    // If execvp returns, it means it failed
+    std::cerr << "execvp failed" << std::endl;
+
+    // Free allocated memory
+    for (char *arg : args_array)
+    {
+      if (arg != nullptr)
+      {
+        free(arg);
+      }
+    }
+    exit(1);
+  }
+  else
+  {
+    // Parent process
+    int status;
+    waitpid(pid, &status, 0);
+  }
 }
