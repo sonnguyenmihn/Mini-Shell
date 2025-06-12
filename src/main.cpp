@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <string.h>
+#include <fstream>
 
 // Global variables
 const std::unordered_set<std::string> BUILTIN_COMMANDS = {
@@ -75,16 +76,58 @@ int main()
       }
       else if (command == "echo")
       {
-        // Handle echo command
         if (args.size() > 1)
         {
-          // Join all arguments after "echo" with spaces
           std::string message;
           for (size_t i = 1; i < args.size(); ++i)
           {
             if (i > 1)
               message += " ";
-            message += args[i];
+
+            std::string arg = args[i];
+            std::string processed;
+            bool in_single_quotes = false;
+            bool in_double_quotes = false;
+
+            // Process the argument
+            for (size_t j = 0; j < arg.length(); ++j)
+            {
+              // Handle quotes
+              if (arg[j] == '\'')
+              {
+                in_single_quotes = !in_single_quotes;
+                continue;
+              }
+              if (arg[j] == '"')
+              {
+                in_double_quotes = !in_double_quotes;
+                continue;
+              }
+
+              // Handle environment variables (only in double quotes or no quotes)
+              if (!in_single_quotes && arg[j] == '$' && j + 1 < arg.length())
+              {
+                size_t var_start = j + 1;
+                size_t var_end = var_start;
+                while (var_end < arg.length() &&
+                       (isalnum(arg[var_end]) || arg[var_end] == '_'))
+                {
+                  var_end++;
+                }
+                std::string var_name = arg.substr(var_start, var_end - var_start);
+                const char *var_value = std::getenv(var_name.c_str());
+                if (var_value)
+                {
+                  processed += var_value;
+                }
+                j = var_end - 1;
+              }
+              else
+              {
+                processed += arg[j];
+              }
+            }
+            message += processed;
           }
           std::cout << message << std::endl;
         }
@@ -184,6 +227,34 @@ int main()
     {
       // Not a builtin command, check if it's an executable in PATH
       std::string path = find_command_path(command);
+      if (command == "cat")
+      {
+        // Process arguments to handle quotes
+        for (size_t i = 1; i < args.size(); ++i)
+        {
+          std::string arg = args[i];
+          std::string processed;
+          bool in_single_quotes = false;
+          bool in_double_quotes = false;
+
+          // Process the argument to remove quotes
+          for (size_t j = 0; j < arg.length(); ++j)
+          {
+            if (arg[j] == '\'')
+            {
+              in_single_quotes = !in_single_quotes;
+              continue;
+            }
+            if (arg[j] == '"')
+            {
+              in_double_quotes = !in_double_quotes;
+              continue;
+            }
+            processed += arg[j];
+          }
+          args[i] = processed; // Replace the argument with processed version
+        }
+      }
       if (!path.empty())
       {
         execute_command(command, args);
