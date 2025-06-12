@@ -82,7 +82,18 @@ int main()
           for (size_t i = 1; i < args.size(); ++i)
           {
             if (i > 1)
-              message += " ";
+            {
+              // Count spaces between arguments in original input
+              size_t space_count = 0;
+              size_t pos = input.find(args[i - 1]) + args[i - 1].length();
+              while (pos < input.length() && input[pos] == ' ')
+              {
+                space_count++;
+                pos++;
+              }
+              // Add the same number of spaces
+              message.append(space_count, ' ');
+            }
 
             std::string arg = args[i];
             std::string processed;
