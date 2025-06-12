@@ -83,7 +83,7 @@ int main()
           std::string message;
           for (size_t i = 1; i < args.size(); ++i)
           {
-            if (i > 1 && i < args.size() - 1)
+            if (i > 1 && i < args.size())
             {
               message += " "; // Add a single space between arguments
             }
