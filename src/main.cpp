@@ -78,27 +78,17 @@ int main()
       {
         if (args.size() > 1)
         {
+          bool in_single_quotes = false;
+          bool in_double_quotes = false;
           std::string message;
           for (size_t i = 1; i < args.size(); ++i)
           {
-            if (i > 1)
+            if (i > 1 && i < args.size() - 1)
             {
-              // Count spaces between arguments in original input
-              size_t space_count = 0;
-              size_t pos = input.find(args[i - 1]) + args[i - 1].length();
-              while (pos < input.length() && input[pos] == ' ')
-              {
-                space_count++;
-                pos++;
-              }
-              // Add the same number of spaces
-              message.append(space_count, ' ');
+              message += " "; // Add a single space between arguments
             }
-
             std::string arg = args[i];
             std::string processed;
-            bool in_single_quotes = false;
-            bool in_double_quotes = false;
 
             // Process the argument
             for (size_t j = 0; j < arg.length(); ++j)
@@ -284,13 +274,37 @@ std::vector<std::string> split(const std::string &str, char delim)
 {
   std::vector<std::string> tokens;
   std::string token;
-  std::istringstream tokenStream(str);
-  while (std::getline(tokenStream, token, delim))
+  bool in_single_quotes = false;
+  bool in_double_quotes = false;
+
+  for (size_t i = 0; i < str.length(); ++i)
   {
-    if (!token.empty())
+    if (str[i] == '\'')
     {
-      tokens.push_back(token);
+      in_single_quotes = !in_single_quotes;
+      token += str[i];
     }
+    else if (str[i] == '"')
+    {
+      in_double_quotes = !in_double_quotes;
+      token += str[i];
+    }
+    else if (str[i] == delim && !in_single_quotes && !in_double_quotes)
+    {
+      if (!token.empty())
+      {
+        tokens.push_back(token);
+        token.clear();
+      }
+    }
+    else
+    {
+      token += str[i];
+    }
+  }
+  if (!token.empty())
+  {
+    tokens.push_back(token);
   }
   return tokens;
 }
